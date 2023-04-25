@@ -21,11 +21,18 @@ class Person:
         self.messages = []
 
 
+def log_prompt(prompt):
+    with open("prompt_log.txt", "a") as f:
+        f.write(json.dumps(prompt, indent=2))
+        f.write("\n\n")
+
+
 def create_person(name, description):
     return Person(name, description)
 
 
 def get_chat_gpt_response(prompt):
+    log_prompt(prompt)
     response = openai.ChatCompletion.create(
         model=MODEL,
         messages=prompt
