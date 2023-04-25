@@ -21,7 +21,7 @@ openai.api_key = OPENAI_API_KEY
 
 # Available colors in termcolor, ignore gray and white.
 COLORS = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan']
-VOICES: {
+VOICES = {
     'female': ['Rachel', 'Domi', 'Bella', 'Elli'],
     'male': ['Antoni', 'Josh', 'Arnold', 'Adam', 'Sam']
 }
@@ -31,19 +31,20 @@ assigned_voices = {'female': [], 'male': []}
 
 
 class Person:
-    def __init__(self, name, description, color, gender, voice):
+    def __init__(self, name, description, color, gender=None, voice=None):
         self.name = name
         self.description = description
         self.color = color
         self.gender = gender
         self.voice = voice
-        self.messages = []
 
 
 def log_prompt(prompt):
     with open("prompt_log.txt", "a") as f:
-        f.write(json.dumps(prompt, indent=2))
-        f.write("\n\n")
+        for message in prompt:
+            f.write(f"role: {message['role']}\n")
+            f.write(f"content: {message['content']}\n")
+        f.write("\n")
 
 
 def play_audio(audio_file):
@@ -114,7 +115,7 @@ def generate_message(person_to_answer, previous_conversation, people):
     return response_message
 
 
-def get_best_fit_person_index(people, conversation, latest_writer_index):
+def get_best_fit_person_to_respond(people, conversation, latest_writer_index):
     roles = [f"{i + 1}. {person.name.capitalize()}, {person.description}" for i, person in enumerate(people)]
     roles_str = "\n".join(roles)
 
@@ -146,34 +147,38 @@ def chat_simulation(people, iterations):
     latest_writer_index = None
 
     for i in range(iterations):
-        best_fit_person_index = get_best_fit_person_index(people, conversation, latest_writer_index)
+        best_fit_person_index = get_best_fit_person_to_respond(people, conversation, latest_writer_index)
         message = generate_message(people[best_fit_person_index], conversation, people)
         conversation.append(("user", f"{people[best_fit_person_index].name}: {message}"))
         cprint(f"\n{people[best_fit_person_index].name}: {message}", people[best_fit_person_index].color)
 
-        if ELEVENLABS_API_KEY:
+        if ELEVENLABS_API_KEY and people[best_fit_person_index].gender:
             audio_file = generate_audio(message, people[best_fit_person_index])
             play_audio(audio_file)
 
         latest_writer_index = best_fit_person_index
 
 
-def get_person_input(person_number):
+def print_person_info(people):
+    for i, person in enumerate(people):
+        print(f"{i + 1}. {person.name}, {person.description}")
+
+
+def get_person_details_from_user(person_number):
     name = input(f"Enter the name for person {person_number}: ")
     description = input(
         f"Enter a description for person {person_number} (example: 'a computer nerd who loves coffee'): ")
-    gender = ""
-    while gender.lower() not in ["m", "f"]:
-        gender = input(f"Enter the gender for person {person_number} ('m' for male, 'f' for female): ")
-    return name, description, gender
+    gender = None
+    if ELEVENLABS_API_KEY:
+        while gender not in ["m", "f", ""]:
+            gender = input(
+                f"Enter the gender for person {person_number} ('m' for male, 'f' for female, leave blank to skip): ").lower()
+    color = COLORS[person_number % len(COLORS)]  # Assign color to each person
+    return name, description, color, gender
 
 
 def create_and_save_people(num_people):
-    people = []
-    for i in range(num_people):
-        name, description, gender = get_person_input(i + 1)
-        color = COLORS[i % len(COLORS)]  # Assign color to each person
-        people.append(create_person(name, description, color, gender))
+    people = [Person(*get_person_details_from_user(i + 1)) for i in range(num_people)]
     save_to_json(people)
     return people
 
@@ -191,7 +196,7 @@ def load_from_json():
         with open("names_and_personalities.json", "r") as f:
             data = json.load(f)
             people = [
-                create_person(person_data["name"], person_data["description"], person_data["color"], person_data["gender"]) for
+                create_person(person_data["name"], person_data["description"], person_data["color"], person_data["gender"]) if ELEVENLABS_API_KEY and person_data["gender"] else Person(person_data["name"], person_data["description"], person_data["color"], person_data["gender"]) for
                 person_data in data.values()]
             return people
     except (FileNotFoundError, PermissionError, json.JSONDecodeError, KeyError):
@@ -213,8 +218,7 @@ def main():
         people = load_from_json()
         if len(people):
             print("Previous names and descriptions:")
-            for i, person in enumerate(people):
-                print(f"{i + 1}. {person.name}, {person.description}")
+            print_person_info(people)
 
             use_previous = input("Would you like to use the previous names and descriptions? (y/n): ").lower()
             if use_previous != 'y':
