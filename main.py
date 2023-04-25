@@ -1,10 +1,13 @@
 import openai
 from decouple import config
 from termcolor import cprint
+import argparse
 import json
 import os
+import random
 
 OPENAI_API_KEY = config('OPENAI_API_KEY')
+MODEL = config('MODEL', default="gpt-3.5-turbo")
 
 if not OPENAI_API_KEY:
     print('OpenAI API key not defined in .env.')
@@ -12,16 +15,22 @@ if not OPENAI_API_KEY:
 openai.api_key = OPENAI_API_KEY
 
 class Person:
-    def __init__(self, name, personality):
+    def __init__(self, name, description):
         self.name = name
-        self.personality = personality
+        self.description = description
         self.messages = []
 
-print_magenta = lambda text: cprint(text, "magenta")
-print_cyan = lambda text: cprint(text, "cyan")
 
-def create_person(name, personality):
-    return Person(name, personality)
+def create_person(name, description):
+    return Person(name, description)
+
+
+def get_chat_gpt_response(prompt):
+    response = openai.ChatCompletion.create(
+        model=MODEL,
+        messages=prompt
+    )
+    return response.choices[0].message['content'].strip()
 
 
 def generate_message(person, conversation):
@@ -40,56 +49,61 @@ def generate_message(person, conversation):
         role, content = msg
         prompt.append({"role": role, "content": content})
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=prompt
-    )
-
-    return response.choices[0].message['content']
+    response_message = get_chat_gpt_response(prompt)
+    return response_message
 
 
-def chat_simulation(person1, person2, iterations):
+def get_best_fit_person_index(people, conversation, latest_writer_index):
+    roles = [{"role": "system", "content": f"{i+1}: {person.name}, {person.personality}"} for i, person in enumerate(people)]
+
+    prompt = [
+                 {"role": "system", "content": "Choose the best person to respond to the latest message based on the content and the message history as a whole. Only respond with an integer representing the number of the person in the list (example response: 1). Here's the list of the people involved:\n"},
+             ] + roles
+
+    response = get_chat_gpt_response(prompt)
+
+    try:
+        index = int(response) - 1  # Convert to zero-based index
+        if 0 <= index < len(people):
+            return index
+        else:
+            raise ValueError("Index out of range")
+    except ValueError:
+        # If the response is not a valid integer, choose a person at random, excluding the latest writer
+        available_indices = [i for i in range(len(people)) if i != latest_writer_index]
+        return random.choice(available_indices)
+
+
+def chat_simulation(people, iterations):
     conversation = []
+    latest_writer_index = None
 
     for i in range(iterations):
-        if i % 2 == 0:
-            sender = person1
-            receiver = person2
-        else:
-            sender = person2
-            receiver = person1
+        best_fit_person_index = get_best_fit_person_index(people, conversation, latest_writer_index)
+        message = generate_message(people[best_fit_person_index], conversation)
+        conversation.append(("user", f"{people[best_fit_person_index].name}: {message}"))
+        print(f"\n{people[best_fit_person_index].name}: {message}")
 
-        message = generate_message(sender, conversation)
-        conversation.append(("user", f"{sender.name}: {message}"))
-
-        printer = print_cyan if sender == person1 else print_magenta
-        printer(f"\n{sender.name}: {message}")
+        latest_writer_index = best_fit_person_index
 
 
 def get_person_input(person_number):
     name = input(f"Enter the name for person {person_number}: ")
-    personality = input(f"Enter the personality for person {person_number}: ")
-    return name, personality
+    description = input(f"Enter a description for person {person_number} (example: 'a computer nerd who loves coffee'): ")
+    return name, description
 
 
-def create_and_save_people():
-    name1, personality1 = get_person_input(1)
-    name2, personality2 = get_person_input(2)
-    save_to_json(name1, personality1, name2, personality2)
-    return create_person(name1, personality1), create_person(name2, personality2)
+def create_and_save_people(num_people):
+    people = []
+    for i in range(num_people):
+        name, personality = get_person_input(i + 1)
+        people.append(create_person(name, personality))
+    save_to_json(people)
+    return people
 
 
-def save_to_json(name1, personality1, name2, personality2):
-    data = {
-        "person1": {
-            "name": name1,
-            "personality": personality1
-        },
-        "person2": {
-            "name": name2,
-            "personality": personality2
-        }
-    }
+def save_to_json(people):
+    data = {f"person{i + 1}": {"name": person.name, "personality": person.personality} for i, person in enumerate(people)}
     with open("names_and_personalities.json", "w") as f:
         json.dump(data, f)
 
@@ -97,25 +111,37 @@ def save_to_json(name1, personality1, name2, personality2):
 def load_from_json():
     with open("names_and_personalities.json", "r") as f:
         data = json.load(f)
-    return data["person1"]["name"], data["person1"]["personality"], data["person2"]["name"], data["person2"]["personality"]
-
-
-def main_logic(person1, person2):
-    chat_simulation(person1, person2, 20)
+    people = [create_person(person_data["name"], person_data["personality"]) for person_data in data.values()]
+    return people
 
 
 def main():
-    if os.path.exists("names_and_personalities.json"):
-        use_previous = input("Would you like to use the previous names and personalities? (y/n): ").lower()
-        if use_previous == 'y':
-            name1, personality1, name2, personality2 = load_from_json()
-            person1, person2 = create_person(name1, personality1), create_person(name2, personality2)
-        else:
-            person1, person2 = create_and_save_people()
-    else:
-        person1, person2 = create_and_save_people()
 
-    main_logic(person1, person2)
+    parser = argparse.ArgumentParser(description="Chat simulation using GPT-3.5 Turbo")
+    parser.add_argument(
+        "-i",
+        "--iterations",
+        type=int,
+        default=20,
+        help="Number of iterations for the chat simulation (default: 20)"
+    )
+    args = parser.parse_args()
+
+    if os.path.exists("names_and_personalities.json"):
+        people = load_from_json()
+        print("Previous names and descriptions:")
+        for i, person in enumerate(people):
+            print(f"{i + 1}. {person.name}, {person.description}")
+
+        use_previous = input("Would you like to use the previous names and descriptions? (y/n): ").lower()
+        if use_previous != 'y':
+            num_people = int(input("Enter the number of people chatting: "))
+            people = create_and_save_people(num_people)
+    else:
+        num_people = int(input("Enter the number of people chatting: "))
+        people = create_and_save_people(num_people)
+
+    chat_simulation(people, args.iterations)
 
 
 if __name__ == "__main__":
