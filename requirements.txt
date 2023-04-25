@@ -4,3 +4,6 @@ termcolor~=2.2.0
 transformers~=4.28.1
 tiktoken~=0.3.3
 python-decouple~=3.8.0
+pydub==0.25.1
+elevenlabs
+elevenlabslib
