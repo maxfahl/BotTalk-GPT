@@ -15,6 +15,11 @@ The conversation will go on for 20 iterations per default, but you can adjust th
 
 **Some conversation examples:**
 
+Coffee vs. Tea
 ![1](https://user-images.githubusercontent.com/19852554/234594645-cadd8a1f-fe99-4bb5-b2a2-b88bde46594b.png)
+Love is in the air
 ![2](https://user-images.githubusercontent.com/19852554/234594674-c311bd61-4c49-4ea7-b4e7-6b5a878a86e1.png)
+Dad trying to get his sun away from the computer
 ![3](https://user-images.githubusercontent.com/19852554/234594682-72dfc590-c926-4767-99b8-add26f08046e.png)
+And a favourite of mine so far, Steve Jobs and Bill Gates discussing news
+![4](https://user-images.githubusercontent.com/19852554/234599980-b73af344-ee0c-40bb-a966-186ccc74022e.png)
