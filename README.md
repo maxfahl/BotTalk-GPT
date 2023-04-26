@@ -13,6 +13,8 @@ I've only tried it using 3.5-turbo so far since I don't have access to 4.0 throu
 
 The conversation will go on for 20 iterations per default, but you can adjust that by changing the iteration count using the argument `-i` (example: `python ./main.py -i 50`),
 
-**Examples:**
+**Some conversation examples:**
 
-
+![1](https://user-images.githubusercontent.com/19852554/234594645-cadd8a1f-fe99-4bb5-b2a2-b88bde46594b.png)
+![2](https://user-images.githubusercontent.com/19852554/234594674-c311bd61-4c49-4ea7-b4e7-6b5a878a86e1.png)
+![3](https://user-images.githubusercontent.com/19852554/234594682-72dfc590-c926-4767-99b8-add26f08046e.png)
