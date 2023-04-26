@@ -1,17 +1,18 @@
-import openai
-from decouple import config
-from termcolor import colored, cprint
+import time
+import subprocess
+import os
+import re
 import argparse
 import json
 import random
+from tempfile import NamedTemporaryFile
+import openai
+from dotenv import load_dotenv
+from termcolor import colored, cprint
 from elevenlabs import generate, play, set_api_key
 from elevenlabs import voices
 from io import BytesIO
 from pydub import AudioSegment
-import subprocess
-import os
-import re
-from tempfile import NamedTemporaryFile
 
 parser = argparse.ArgumentParser(description="Chat simulation using GPT-3.5 Turbo")
 parser.add_argument(
@@ -29,9 +30,10 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-OPENAI_API_KEY = config('OPENAI_API_KEY', default=None)
-MODEL = config('MODEL', default="gpt-3.5-turbo")
-ELEVENLABS_API_KEY = config('ELEVENLABS_API_KEY', default=None)
+load_dotenv()
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', default=None)
+MODEL = os.getenv('MODEL', default="gpt-3.5-turbo")
+ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', default=None)
 
 if not OPENAI_API_KEY:
     cprint("OpenAI API key not defined in .env", "red")
@@ -152,8 +154,9 @@ def do_request(prompt):
         )
         return response.choices[0].message['content'].strip()
     except openai.error.RateLimitError:
-        cprint("The model is currently overloaded with other requests. Please try again later.", "red")
-        return ""
+        cprint("The model is currently overloaded with other requests. Trying again in 10 seconds.", "red")
+        time.sleep(10)
+        return do_request(prompt)
 
 
 def generate_message(person_to_answer, previous_conversation, people, iterations_left):
@@ -191,6 +194,10 @@ def generate_message(person_to_answer, previous_conversation, people, iterations
 
 
 def get_best_fit_person_to_respond(people, previous_conversation, latest_writer_index):
+    # No need to ask ChatGPT if there are only two people in the chat
+    if len(people) == 2:
+        return people[0] if latest_writer_index == 1 else people[1]
+
     people_str_arr = [f"{i + 1}. {person.name} - {person.description}" for i, person in enumerate(people)]
 
     # Exclude the latest writer from the list to decrease the risk of the model choosing the same person
@@ -286,12 +293,16 @@ def main():
             print("Previous names and descriptions:")
             print_person_info(people)
 
-            use_previous = input("Would you like to use the previous names and descriptions? (y/n): ").lower()
-            if use_previous != 'y':
-                num_people = int(input("Enter the number of people chatting: "))
-                people = create_and_save_people(num_people)
+            use_previous = None
+            while use_previous not in ['y', 'n']:
+                use_previous = input("Would you like to use the previous names and descriptions? (y/n): ").lower()
+                if use_previous != 'y':
+                    num_people = int(input("Enter the number of people chatting: "))
+                    people = create_and_save_people(num_people)
         else:
-            num_people = int(input("Enter the number of people chatting: "))
+            num_people = 0
+            while num_people < 2:
+                num_people = int(input("Enter the number of people chatting: "))
             people = create_and_save_people(num_people)
 
         chat_simulation(people, args.iterations)
