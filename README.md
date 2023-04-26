@@ -2,7 +2,7 @@
 
 An experiment of mine that lets you define two or more personalities, giving each of them a name and description. The script will then generate a conversation between the participants using OpenAI ChatGPT.
 
-I've only tried it using 3.5-turbo so far since I don't have access to the 4.0 through the API as of now. The results can sometimes be a bit weird, but it's still pretty fun to play around with. I bet 4.0 would be leaps and bounds better for this. I've engineered the prompts as good as I can, but since I'm no pro, there's definitely room for improvement. If anyone has any ideas on how to improve them, feel free to open an issue or a pull request. Also, if you try it out with 4.0, let me know how it goes!
+I've only tried it using 3.5-turbo so far since I don't have access to 4.0 through the API as of now. The results can sometimes be a bit weird, but it's still pretty fun to play around with. I bet 4.0 would be leaps and bounds better for this. I've engineered the prompts as good as I can, but since I'm no pro, there's definitely room for improvement. If anyone has any ideas on how to improve them, feel free to open an issue or a pull request. Also, if you try it out with 4.0, let me know how it goes!
 
 **Instructions:**
 - Rename `.env.example` to `.env`
