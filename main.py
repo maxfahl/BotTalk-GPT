@@ -34,7 +34,7 @@ MODEL = config('MODEL', default="gpt-3.5-turbo")
 ELEVENLABS_API_KEY = config('ELEVENLABS_API_KEY', default=None)
 
 if not OPENAI_API_KEY:
-    print('OpenAI API key not defined in .env.')
+    cprint("OpenAI API key not defined in .env", "red")
     quit()
 
 openai.api_key = OPENAI_API_KEY
@@ -62,14 +62,10 @@ class Person:
         self.voice = voice
 
 
-def log_prompt(prompt):
+def log(message):
     if args.debug:
         with open(PROMPT_LOG, "a") as f:
-            for message in prompt:
-                f.write("---\n")
-                f.write(f"role: {message['role']}\n")
-                f.write(f"content: {message['content']}\n")
-            f.write("\n")
+            f.write(f"{message}\n\n")
 
 
 def save_people_to_json(people):
@@ -116,7 +112,7 @@ def generate_audio(text, person):
             break
 
     if not voice:
-        print(f"Voice '{voice_name}' not found. Please check the available voices.")
+        cprint(f"Voice '{voice_name}' not found. Please check the available voices.", "red")
         return
 
     audio_data = generate(text, voice=voice)
@@ -148,7 +144,7 @@ def create_person(name, description, color, gender=None):
 
 
 def do_request(prompt):
-    log_prompt(prompt)
+    log(prompt[0]['content'])
     try:
         response = openai.ChatCompletion.create(
             model=MODEL,
@@ -156,16 +152,16 @@ def do_request(prompt):
         )
         return response.choices[0].message['content'].strip()
     except openai.error.RateLimitError:
-        print("The model is currently overloaded with other requests. Please try again later.")
+        cprint("The model is currently overloaded with other requests. Please try again later.", "red")
         return ""
 
 
 def generate_message(person_to_answer, previous_conversation, people, iterations_left):
-    people_str_arr = [f"• {person.name}, {person.description}" for i, person in enumerate(people)]
+    people_str_arr = [f"• {person.name} - {person.description}" for i, person in enumerate(people)]
 
     # Filter out the index of the person who is answering
-    person_to_answer_index = people.index(person_to_answer)
-    del people_str_arr[person_to_answer_index]
+    # person_to_answer_index = people.index(person_to_answer)
+    # del people_str_arr[person_to_answer_index]
 
     people_str = "\n".join(people_str_arr)
 
@@ -178,9 +174,9 @@ def generate_message(person_to_answer, previous_conversation, people, iterations
     elif iterations_left < len(people):
         system_content += " The conversation is now over. Say any last words as a good-bye."
     else:
-        system_content += " Come up with a short to medium sized text message that answers the previous message. Keep all the messages in mind to understand the context of the conversation. Keep track of the names in the beginning of each message to identify each writer. The message should keep the conversation going, do not say good-bye."
+        system_content += " Come up with a short to medium sized text message (one paragraph) to answer the previous message. Keep all the messages in mind to understand the context of the conversation. Keep track of the names in the beginning of each message to identify each writer. The message should keep the conversation going, do not say good-bye."
 
-    system_content += f" You know the other {'people' if len(people) > 2 else 'person' } in the chat very well.{' There are only you and one other person in the chat. Only talk to the other person directly, do not include his or her name in the message.' if len(people) > 2 else ''} Answer as casually as possible unless the description contradicts it. Only send a message from yourself. The message should be in the form of a SMS message. Do not include any phrases containing another person's name such as \"(NAME)\" or \"Hey NAME\") in the beginning of the message. There are a total of {len(people_str_arr)} people involved in the conversation, here's the list of people (not including you) with their name and description:\n" + people_str
+    system_content += f" You know the {'people' if len(people) > 2 else 'other person' } in the chat very well.{' There are only you and one other person in the chat. Only talk to the other person directly, do not include his or her name in the message. Avoid greeting the other people in the beginning of the message.' if len(people) == 2 else ' Include all participants in the chat as much as possible, but do not include their names in the message. Avoid greeting the other person in the beginning of the message.'} Answer as casually as possible unless the description of yourself contradicts being casual. Don\'t be afraid including one or two emojis (maximum one emoji per sentence), but do not overdo it. Only send a message from yourself. The message should be in the form of a SMS message. Do not use phrases such as \"hey guys\" or \"hello everyone\" in the beginning of the message. Do not include any names in the beginning of the message, avoid for example \"([NAME])\" and \"Hey [NAME]\") etc. There are a total of {len(people_str_arr)} people involved in the conversation. Here\'s a list of the participants (including yourself) together with names and a personal descriptions:\n" + people_str
 
     prompt = [{"role": "system", "content": system_content}]
     for msg in previous_conversation:
@@ -195,7 +191,7 @@ def generate_message(person_to_answer, previous_conversation, people, iterations
 
 
 def get_best_fit_person_to_respond(people, previous_conversation, latest_writer_index):
-    people_str_arr = [f"{i + 1}. {person.name}, {person.description}" for i, person in enumerate(people)]
+    people_str_arr = [f"{i + 1}. {person.name} - {person.description}" for i, person in enumerate(people)]
 
     # Exclude the latest writer from the list to decrease the risk of the model choosing the same person
     if latest_writer_index is not None:
@@ -206,7 +202,7 @@ def get_best_fit_person_to_respond(people, previous_conversation, latest_writer_
     if len(previous_conversation) == 0:
         content = "Choose the best person to start the conversation."
     else:
-        content = "Choose the best person to respond to the latest message based its content, but also consider the message history as a whole."
+        content = "Choose the best person to respond to the latest message based its content, but also consider the message history as a whole. Do not select the person who wrote the latest message."
 
     content += " Only respond with an integer representing the number of a person in the list below (example response: 1). Here's the list of the people to choose from:\n" + people_str
 
@@ -249,7 +245,7 @@ def chat_simulation(people, iterations):
                 play_audio(audio_file)
         elif ELEVENLABS_API_KEY:
             print(
-                f'Can not convert message to speech since {person.name} does not have a gender assigned. Please restart and create people from scratch.')
+                f"Can not convert message to speech since {person.name} does not have a gender assigned. Please restart and create people from scratch.")
 
         latest_writer_index = people.index(person)
 
@@ -262,7 +258,7 @@ def print_person_info(people):
 def get_person_details_from_user(person_number):
     name = input(f"Enter the name for person {person_number}: ").capitalize()
     description = input(
-        f"Enter a description for person {person_number} (example: 'a computer nerd who loves coffee'): ")
+        f"Enter a description for person {person_number} (example: 'A computer nerd who loves coffee'): ")
     gender = None
     if ELEVENLABS_API_KEY:
         while gender not in ["m", "f"]:
