@@ -56,7 +56,12 @@ def generate_audio(text, person):
     user = ElevenLabsUser(ELEVENLABS_API_KEY)
     voice_name = person.voice
 
-    premade_voice = user.get_voices_by_name(voice_name)[0]
+    voices = user.get_voices_by_name(voice_name)
+    if not voices:
+        print(f"Voice '{voice_name}' not found. Please check the available voices.")
+        return
+
+    premade_voice = voices[0]
     audio_data = premade_voice.generate_audio_bytes(text)
 
     memory_file = io.BytesIO()
@@ -66,7 +71,8 @@ def generate_audio(text, person):
     return memory_file
 
 
-def create_person(name, description, color, gender):
+
+def get_voice_for_person(gender):
     global assigned_voices
 
     # If all available voices for the gender have been assigned, reset the list
@@ -78,6 +84,13 @@ def create_person(name, description, color, gender):
     voice = random.choice(available_voices)
     assigned_voices[gender].append(voice)
 
+    return voice
+
+
+def create_person(name, description, color, gender):
+    voice = None
+    if gender:
+        voice = get_voice_for_person(gender)
     return Person(name, description, color, gender, voice)
 
 
@@ -154,7 +167,8 @@ def chat_simulation(people, iterations):
 
         if ELEVENLABS_API_KEY and people[best_fit_person_index].gender:
             audio_file = generate_audio(message, people[best_fit_person_index])
-            play_audio(audio_file)
+            if audio_file is not None:
+                play_audio(audio_file)
 
         latest_writer_index = best_fit_person_index
 
@@ -198,6 +212,7 @@ def load_from_json():
             people = [
                 create_person(person_data["name"], person_data["description"], person_data["color"], person_data["gender"]) if ELEVENLABS_API_KEY and person_data["gender"] else Person(person_data["name"], person_data["description"], person_data["color"], person_data["gender"]) for
                 person_data in data.values()]
+            print(f"Loaded people from JSON: {people}")  # Add this line
             return people
     except (FileNotFoundError, PermissionError, json.JSONDecodeError, KeyError):
         return []
