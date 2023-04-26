@@ -49,7 +49,7 @@ VOICES = {
     'f': ['Rachel', 'Domi', 'Bella', 'Elli'],
     'm': ['Antoni', 'Josh', 'Arnold', 'Adam', 'Sam']
 }
-PEOPLE_JSON = 'people.json'
+DATA_JSON = 'previous_settings.json'
 PROMPT_LOG = 'prompt_log.txt'
 
 assigned_voices = {'f': [], 'm': []}
@@ -63,6 +63,13 @@ class Person:
         self.gender = gender
         self.voice = voice
 
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "gender": self.gender
+        }
+
 
 def log(message):
     if args.debug:
@@ -70,30 +77,29 @@ def log(message):
             f.write(f"{message}\n\n")
 
 
-def save_people_to_json(people):
-    data = {"people": [{"name": person.name, "color": person.color, "description": person.description,
-                        "gender": person.gender} for person in people]}
-    with open(PEOPLE_JSON, "w") as f:
-        json.dump(data, f, indent=4)
+def save_data_to_json(data):
+    with open(DATA_JSON, "w") as f:
+        json.dump({"topic": data["topic"], "people": [person for person in data["people"]]}, f, indent=4)
 
 
-def load_people_from_json():
+def load_data_from_json():
     try:
-        with open(PEOPLE_JSON, "r") as f:
+        with open(DATA_JSON, "r") as f:
             data = json.load(f)
+            people_data = data["people"]
             people = [
-                create_person(
+                Person(
                     person_data["name"],
                     person_data["description"],
-                    person_data["color"],
-                    person_data["gender"] if "gender" in person_data else None
+                    COLORS[i % len(COLORS)],  # Assign color to each person
+                    person_data.get("gender")
                 )
-                for person_data in data["people"]
+                for i, person_data in enumerate(people_data)
             ]
-
-            return people
+            topic = data.get("topic", "")
+            return people, topic
     except (FileNotFoundError, PermissionError, json.JSONDecodeError, KeyError):
-        return []
+        return [], ""
 
 
 def play_audio(audio_segment):
@@ -159,7 +165,7 @@ def do_request(prompt):
         return do_request(prompt)
 
 
-def generate_message(person_to_answer, previous_conversation, people, iterations_left):
+def generate_message(person_to_answer, previous_conversation, people, topic, iterations_left):
     people_str_arr = [f"• {person.name} - {person.description}" for i, person in enumerate(people)]
 
     # Filter out the index of the person who is answering
@@ -171,15 +177,17 @@ def generate_message(person_to_answer, previous_conversation, people, iterations
     system_content = f"You are writing a message as {person_to_answer.name}."
 
     if len(previous_conversation) == 0:
-        system_content += " Come up with a short to medium sized text message that ends with question or a statement."
+        topic_insert = f' based on the topic "{topic}"' if topic else ''
+        system_content += f" Come up with a short to medium sized text message{topic_insert} that ends with question or a statement."
     elif iterations_left == len(people):
         system_content += " Conclude the conversation based on the previous messages. Make up a reason to why you must end the chatting session. Say good-bye to the other participants."
     elif iterations_left < len(people):
         system_content += " The conversation is now over. Say any last words as a good-bye."
     else:
-        system_content += " Come up with a short to medium sized text message (one paragraph) to answer the previous message. Keep all the messages in mind to understand the context of the conversation. Keep track of the names in the beginning of each message to identify each writer. The message should keep the conversation going, do not say good-bye."
+        topic_insert = f' The discussion is around the topic "{topic}".' if topic else ''
+        system_content += f" Answer the previous message with a short to medium sized message (about one paragraph). Analyze the message history to understand the context of the conversation.{topic_insert} Look at the name in the beginning of each message to identify each writer. The message should keep the conversation going, do not say good-bye."
 
-    system_content += f" You know the {'people' if len(people) > 2 else 'other person' } in the chat very well.{' There are only you and one other person in the chat. Only talk to the other person directly, do not include his or her name in the message. Avoid greeting the other people in the beginning of the message.' if len(people) == 2 else ' Include all participants in the chat as much as possible, but do not include their names in the message. Avoid greeting the other person in the beginning of the message.'} Answer as casually as possible unless the description of yourself contradicts being casual. Don\'t be afraid including one or two emojis (maximum one emoji per sentence), but do not overdo it. Only send a message from yourself. The message should be in the form of a SMS message. Do not use phrases such as \"hey guys\" or \"hello everyone\" in the beginning of the message. Do not include any names in the beginning of the message, avoid for example \"([NAME])\" and \"Hey [NAME]\") etc. There are a total of {len(people_str_arr)} people involved in the conversation. Here\'s a list of the participants (including yourself) together with names and a personal descriptions:\n" + people_str
+    system_content += f" You know the {'people' if len(people) > 2 else 'other person'} in the chat very well.{' There are only you and one other person in the chat. Only talk to the other person directly. Avoid greeting the other people in the beginning of the message.' if len(people) == 2 else ' Include all participants in the chat as much as possible, but do not include their names in the message.'} Avoid greeting phrases. Avoid typing names if not absolutely necessary. Answer as casually as possible unless the description of yourself contradicts being casual. Don\'t be afraid including one or two emojis (maximum one emoji per sentence), but do not overdo it. Only send a message from yourself. The message should be in the form of a SMS message. Do not use phrases such as \"hey guys\" or \"hello everyone\" in the beginning of the message. Do not include any names in the beginning of the message, avoid for example \"([NAME])\" and \"Hey [NAME]\") etc. There are a total of {len(people_str_arr)} people involved in the conversation. Here\'s a list of the participants (including yourself) together with names and a personal descriptions:\n" + people_str
 
     prompt = [{"role": "system", "content": system_content}]
     for msg in previous_conversation:
@@ -193,9 +201,9 @@ def generate_message(person_to_answer, previous_conversation, people, iterations
     return response_message
 
 
-def get_best_fit_person_to_respond(people, previous_conversation, latest_writer_index):
+def get_best_fit_person_to_respond(people, topic, previous_conversation, latest_writer_index):
     # No need to ask ChatGPT if there are only two people in the chat
-    if len(people) == 2:
+    if len(people) == 2 and not len(previous_conversation) == 0:
         return people[0] if latest_writer_index == 1 else people[1]
 
     people_str_arr = [f"{i + 1}. {person.name} - {person.description}" for i, person in enumerate(people)]
@@ -207,9 +215,11 @@ def get_best_fit_person_to_respond(people, previous_conversation, latest_writer_
 
     content = ''
     if len(previous_conversation) == 0:
-        content = "Choose the best person to start the conversation."
+        topic_insert = f' based on the topic "{topic}"' if topic else ''
+        content = f"Choose the best person to start the conversation{topic_insert}."
     else:
-        content = "Choose the best person to respond to the latest message based its content, but also consider the message history as a whole. Do not select the person who wrote the latest message."
+        topic_insert = f' and the topic "{topic}"' if topic else ''
+        content = f"Choose the best person to respond to the latest message{topic_insert}, but also consider the message history as a whole. Do not select the person who wrote the latest message."
 
     content += " Only respond with an integer representing the number of a person in the list below (example response: 1). Here's the list of the people to choose from:\n" + people_str
 
@@ -232,14 +242,14 @@ def get_best_fit_person_to_respond(people, previous_conversation, latest_writer_
         return people[index]
 
 
-def chat_simulation(people, iterations):
+def chat_simulation(topic, people, iterations):
     conversation = []
     latest_writer_index = None
 
     for i in range(iterations):
         iterations_left = iterations - i
-        person = get_best_fit_person_to_respond(people, conversation, latest_writer_index)
-        message = generate_message(person, conversation, people, iterations_left)
+        person = get_best_fit_person_to_respond(people, topic, conversation, latest_writer_index)
+        message = generate_message(person, conversation, people, topic, iterations_left)
         conversation.append(("user", f"({person.name}) {message}"))
         cprint(f"\n{person.name}: {message}", person.color)
 
@@ -257,12 +267,7 @@ def chat_simulation(people, iterations):
         latest_writer_index = people.index(person)
 
 
-def print_person_info(people):
-    for i, person in enumerate(people):
-        print(f"{i + 1}. {person.name}, {person.description}")
-
-
-def get_person_details_from_user(person_number):
+def get_person_details_for_user(person_number):
     name = input(f"Enter the name for person {person_number}: ").capitalize()
     description = input(
         f"Enter a description for person {person_number} (example: 'A computer nerd who loves coffee'): ")
@@ -275,37 +280,50 @@ def get_person_details_from_user(person_number):
     return name, description, color, gender
 
 
-def create_and_save_people(num_people):
-    people = [Person(*get_person_details_from_user(i + 1)) for i in range(num_people)]
-    save_people_to_json(people)
+def create_people(num_people):
+    people = [Person(*get_person_details_for_user(i + 1)) for i in range(num_people)]
     return people
 
 
 def main():
-    # # Clear the log if debug mode is on
-    # if args.debug:
-    #     with open(PROMPT_LOG, "w") as f:
-    #         pass
-
     try:
-        people = load_people_from_json()
+        people, topic = load_data_from_json()
+
         if len(people):
-            print("Previous names and descriptions:")
-            print_person_info(people)
+            cprint("Previous settings\n", "cyan", attrs=["bold"])
+            saved_data_str = ''
+            if topic:
+                saved_data_str += f"Topic: \"{topic}\"\n"
+            saved_data_str += "Names and descriptions:\n"
+            for i, person in enumerate(people):
+                saved_data_str += f"    {i + 1}. {person.name}, {person.description}\n"
+            cprint(saved_data_str, "cyan")
 
             use_previous = None
             while use_previous not in ['y', 'n']:
-                use_previous = input("Would you like to use the previous names and descriptions? (y/n): ").lower()
-                if use_previous != 'y':
-                    num_people = int(input("Enter the number of people chatting: "))
-                    people = create_and_save_people(num_people)
-        else:
+                use_previous = input("Would you like to start using the previous settings? (y/n): ").lower()
+                if use_previous == 'n':
+                    people = None
+
+        if not people:
+            topic = input("Enter a topic for discussion (leave blank for free discussion): ")
+
             num_people = 0
             while num_people < 2:
-                num_people = int(input("Enter the number of people chatting: "))
-            people = create_and_save_people(num_people)
+                try:
+                    num_people = int(input("Enter the number of people chatting: "))
+                except ValueError:
+                    print("Invalid input. Please enter a valid integer.")
 
-        chat_simulation(people, args.iterations)
+            people = create_people(num_people)
+            data = {
+                "topic": topic,
+                "people": [
+                    person.to_dict() for person in people
+                ]
+            }
+            save_data_to_json(data)
+        chat_simulation(topic, people, args.iterations)
     except KeyboardInterrupt:
         print("\nBye-bye...")
 
