@@ -15,6 +15,9 @@ The conversation will go on for 20 iterations per default, but you can adjust th
 
 **Some conversation examples:**
 
+Satan having an identity crisis
+![5](https://user-images.githubusercontent.com/19852554/234862040-2aa3c1e3-96dd-49d7-8487-f3f1b7aa2fa0.png)
+
 Coffee vs. Tea
 ![1](https://user-images.githubusercontent.com/19852554/234594645-cadd8a1f-fe99-4bb5-b2a2-b88bde46594b.png)
 
