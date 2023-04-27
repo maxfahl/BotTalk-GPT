@@ -296,7 +296,7 @@ def main():
                 saved_data_str += f"Topic: \"{topic}\"\n"
             saved_data_str += "Names and descriptions:\n"
             for i, person in enumerate(people):
-                saved_data_str += f"    {i + 1}. {person.name}, {person.description}\n"
+                saved_data_str += f"    {i + 1}. {person.name} - {person.description}\n"
             cprint(saved_data_str, "cyan")
 
             use_previous = None
