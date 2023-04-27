@@ -166,7 +166,7 @@ def do_request(prompt):
 
 
 def generate_message(person_to_answer, previous_conversation, people, topic, iterations_left):
-    people_str_arr = [f"• {person.name} - {person.description}" for i, person in enumerate(people)]
+    people_str_arr = [f"• {person.name}{' - ' + person.description if person.description else ''}" for i, person in enumerate(people)]
 
     # Filter out the index of the person who is answering
     # person_to_answer_index = people.index(person_to_answer)
@@ -206,7 +206,7 @@ def get_best_fit_person_to_respond(people, topic, previous_conversation, latest_
     if len(people) == 2 and not len(previous_conversation) == 0:
         return people[0] if latest_writer_index == 1 else people[1]
 
-    people_str_arr = [f"{i + 1}. {person.name} - {person.description}" for i, person in enumerate(people)]
+    people_str_arr = [f"{i + 1}. {person.name}{' - ' + person.description if person.description else ''}" for i, person in enumerate(people)]
 
     # Exclude the latest writer from the list to decrease the risk of the model choosing the same person
     if latest_writer_index is not None:
@@ -296,7 +296,7 @@ def main():
                 saved_data_str += f"Topic: \"{topic}\"\n"
             saved_data_str += "Names and descriptions:\n"
             for i, person in enumerate(people):
-                saved_data_str += f"    {i + 1}. {person.name} - {person.description}\n"
+                saved_data_str += f"    {i + 1}. {person.name}{' - ' + person.description if person.description else ''}\n"
             cprint(saved_data_str, "cyan")
 
             use_previous = None
