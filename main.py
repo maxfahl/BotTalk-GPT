@@ -82,6 +82,16 @@ def save_data_to_json(data):
         json.dump({"topic": data["topic"], "people": [person for person in data["people"]]}, f, indent=4)
 
 
+def format_people_to_list_str(people, prefix=None, exclude=None):
+    items = [
+        f"{prefix if prefix else str(i + 1) + '. '}{person.name}{' - ' + person.description if person.description else ''}"
+        for i, person in enumerate(people)
+    ]
+    if exclude is not None:
+        del items[exclude]
+    return "\n".join(items)
+
+
 def load_data_from_json():
     try:
         with open(DATA_JSON, "r") as f:
@@ -166,13 +176,7 @@ def do_request(prompt):
 
 
 def generate_message(person_to_answer, previous_conversation, people, topic, iterations_left):
-    people_str_arr = [f"• {person.name}{' - ' + person.description if person.description else ''}" for i, person in enumerate(people)]
-
-    # Filter out the index of the person who is answering
-    # person_to_answer_index = people.index(person_to_answer)
-    # del people_str_arr[person_to_answer_index]
-
-    people_str = "\n".join(people_str_arr)
+    people_str = format_people_to_list_str(people, '• ')
 
     system_content = f"You are writing a message as {person_to_answer.name}."
 
@@ -187,7 +191,7 @@ def generate_message(person_to_answer, previous_conversation, people, topic, ite
         topic_insert = f' The discussion is around the topic "{topic}".' if topic else ''
         system_content += f" Answer the previous message with a short to medium sized message (about one paragraph). Analyze the message history to understand the context of the conversation.{topic_insert} Look at the name in the beginning of each message to identify each writer. The message should keep the conversation going, do not say good-bye."
 
-    system_content += f" You know the {'people' if len(people) > 2 else 'other person'} in the chat very well.{' There are only you and one other person in the chat. Only talk to the other person directly. Avoid greeting the other people in the beginning of the message.' if len(people) == 2 else ' Include all participants in the chat as much as possible, but do not include their names in the message.'} Avoid greeting phrases. Avoid typing names if not absolutely necessary. Answer as casually as possible unless the description of yourself contradicts being casual. Don\'t be afraid including one or two emojis (maximum one emoji per sentence), but do not overdo it. Only send a message from yourself. The message should be in the form of a SMS message. Do not use phrases such as \"hey guys\" or \"hello everyone\" in the beginning of the message. Do not include any names in the beginning of the message, avoid for example \"([NAME])\" and \"Hey [NAME]\") etc. There are a total of {len(people_str_arr)} people involved in the conversation. Here\'s a list of the participants (including yourself) together with names and a personal descriptions:\n" + people_str
+    system_content += f" You know the {'people' if len(people) > 2 else 'other person'} in the chat very well.{' There are only you and one other person in the chat. Only talk to the other person directly. Avoid greeting the other people in the beginning of the message.' if len(people) == 2 else ' Include all participants in the chat as much as possible, but do not include their names in the message.'} Avoid greeting phrases. Avoid typing names if not absolutely necessary. Answer as casually as possible unless the description of yourself contradicts being casual. Don\'t be afraid including one or two emojis (maximum one emoji per sentence), but do not overdo it. Only send a message from yourself. The message should be in the form of a SMS message. Do not use phrases such as \"hey guys\" or \"hello everyone\" in the beginning of the message. Do not include any names in the beginning of the message, avoid for example \"([NAME])\" and \"Hey [NAME]\") etc. There are a total of {len(people)} people involved in the conversation. Here\'s a list of the participants (including yourself) together with names and a personal descriptions:\n" + people_str
 
     prompt = [{"role": "system", "content": system_content}]
     for msg in previous_conversation:
@@ -206,12 +210,7 @@ def get_best_fit_person_to_respond(people, topic, previous_conversation, latest_
     if len(people) == 2 and not len(previous_conversation) == 0:
         return people[0] if latest_writer_index == 1 else people[1]
 
-    people_str_arr = [f"{i + 1}. {person.name}{' - ' + person.description if person.description else ''}" for i, person in enumerate(people)]
-
-    # Exclude the latest writer from the list to decrease the risk of the model choosing the same person
-    if latest_writer_index is not None:
-        del people_str_arr[latest_writer_index]
-    people_str = "\n".join(people_str_arr)
+    people_str = format_people_to_list_str(people, None, latest_writer_index)
 
     content = ''
     if len(previous_conversation) == 0:
@@ -295,8 +294,7 @@ def main():
             if topic:
                 saved_data_str += f"Topic: \"{topic}\"\n"
             saved_data_str += "Names and descriptions:\n"
-            for i, person in enumerate(people):
-                saved_data_str += f"    {i + 1}. {person.name}{' - ' + person.description if person.description else ''}\n"
+            saved_data_str += format_people_to_list_str(people, "    ")
             cprint(saved_data_str, "cyan")
 
             use_previous = None
