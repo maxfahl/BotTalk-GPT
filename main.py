@@ -44,7 +44,7 @@ if ELEVENLABS_API_KEY:
     set_api_key(ELEVENLABS_API_KEY)
 
 # Available colors in termcolor, ignore gray and white.
-COLORS = ['yellow', 'green', 'blue', 'magenta', 'cyan', 'red']
+COLORS = ['blue', 'yellow', 'green', 'magenta', 'cyan', 'red']
 VOICES = {
     'f': ['Rachel', 'Domi', 'Bella', 'Elli'],
     'm': ['Antoni', 'Josh', 'Arnold', 'Adam', 'Sam']
