@@ -14,6 +14,7 @@ I've only tried it using 3.5-turbo so far since I don't have access to 4.0 throu
 The conversation will go on for 20 iterations per default, but you can adjust that by changing the iteration count using the argument `-i` (example: `python ./main.py -i 50`),
 
 #### Some conversation examples
+These examples was generated using the 3.5-turbo model. I've since tried version 4 and it is a lot better in these kinds of applications, so I would really recommend that if you have access..
 
 Satan having an identity crisis
 
